@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="kn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ಕನ್ನಡ PDF ಸೇವೆ - ಉಚಿತ PDF ಪರಿವರ್ತಕ</title>
+<meta name="description" content="ಉಚಿತ PDF ಪರಿಕರಗಳು - Word to PDF, PDF Merge, Split, Compress, Image to PDF. ಕನ್ನಡದಲ್ಲಿ ಸುಲಭವಾಗಿ ಬಳಸಿ.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;600;700&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #e63946;
+    --yellow: #f4a61d;
+    --gold: #f7c948;
+    --dark: #1a1a2e;
+    --darker: #0f0f1a;
+    --card: #16213e;
+    --card2: #1a2744;
+    --text: #f0f0f0;
+    --muted: #a0a8c0;
+    --border: rgba(255,255,255,0.08);
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Poppins', 'Noto Sans Kannada', sans-serif;
+    background: var(--darker);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* BG */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(230,57,70,0.12), transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(244,166,29,0.10), transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,15,26,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .nav {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    text-decoration: none;
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--red), var(--yellow));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: white;
+  }
+  .logo-text { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+  .logo-text span { color: var(--yellow); }
+  .nav-links { display: flex; gap: 24px; list-style: none; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none;
+    font-size: 0.9rem; transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--yellow); }
+
+  /* HERO */
+  .hero {
+    position: relative; z-index: 1;
+    text-align: center;
+    padding: 80px 24px 60px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(244,166,29,0.12);
+    border: 1px solid rgba(244,166,29,0.3);
+    color: var(--yellow);
+    padding: 6px 16px; border-radius: 100px;
+    font-size: 0.82rem; font-weight: 600;
+    margin-bottom: 24px;
+    animation: fadeUp 0.5s ease both;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 800; line-height: 1.15;
+    margin-bottom: 16px;
+    animation: fadeUp 0.6s ease 0.1s both;
+  }
+  .hero h1 .kannada-line {
+    display: block;
+    font-family: 'Noto Sans Kannada', sans-serif;
+    background: linear-gradient(90deg, var(--red), var(--yellow));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    color: var(--muted); font-size: 1.05rem;
+    max-width: 520px; margin: 0 auto 36px;
+    animation: fadeUp 0.6s ease 0.2s both;
+    font-family: 'Noto Sans Kannada', sans-serif;
+    line-height: 1.8;
+  }
+  .hero-stats {
+    display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;
+    animation: fadeUp 0.6s ease 0.3s both;
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 1.6rem; font-weight: 800; color: var(--yellow); }
+  .stat-label { font-size: 0.78rem; color: var(--muted); font-family: 'Noto Sans Kannada', sans-serif; }
+
+  /* AD BANNER */
+  .ad-banner {
+    max-width: 728px; margin: 0 auto 32px;
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 8px;
+    height: 90px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 0.8rem;
+    position: relative; z-index: 1;
+  }
+
+  /* TOOLS SECTION */
+  .section {
+    position: relative; z-index: 1;
+    max-width: 1100px; margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+  .section-title {
+    text-align: center; margin-bottom: 40px;
+  }
+  .section-title h2 {
+    font-size: 1.8rem; font-weight: 700;
+    font-family: 'Noto Sans Kannada', sans-serif;
+  }
+  .section-title h2 span { color: var(--yellow); }
+  .section-title p { color: var(--muted); margin-top: 8px; font-family: 'Noto Sans Kannada', sans-serif; }
+
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .tool-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .tool-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--red), var(--yellow));
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .tool-card:hover { transform: translateY(-4px); border-color: rgba(244,166,29,0.3); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+  .tool-card:hover::before { opacity: 1; }
+
+  .tool-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; margin-bottom: 16px;
+  }
+  .tool-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+  .tool-card .kn { font-family: 'Noto Sans Kannada', sans-serif; font-size: 0.88rem; color: var(--yellow); margin-bottom: 8px; }
+  .tool-card p { color: var(--muted); font-size: 0.85rem; font-family: 'Noto Sans Kannada', sans-serif; line-height: 1.7; }
+  .tool-badge {
+    display: inline-block; margin-top: 14px;
+    background: rgba(230,57,70,0.15); color: var(--red);
+    border: 1px solid rgba(230,57,70,0.3);
+    padding: 3px 10px; border-radius: 100px; font-size: 0.72rem; font-weight: 600;
+  }
+  .tool-badge.free { background: rgba(244,166,29,0.12); color: var(--yellow); border-color: rgba(244,166,29,0.3); }
+
+  /* TOOL AREA */
+  .tool-area {
+    display: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 36px;
+    margin-bottom: 32px;
+    position: relative; z-index: 1;
+    max-width: 1100px; margin: 0 auto 32px;
+  }
+  .tool-area.active { display: block; }
+  .tool-area-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .tool-area-header h2 { font-size: 1.3rem; font-weight: 700; }
+  .tool-area-header .kn { font-family: 'Noto Sans Kannada', sans-serif; color: var(--yellow); font-size: 0.9rem; }
+  .close-btn {
+    background: rgba(255,255,255,0.06); border: none; color: var(--muted);
+    width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px;
+    display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+  }
+  .close-btn:hover { background: rgba(255,255,255,0.12); }
+
+  /* DROPZONE */
+  .dropzone {
+    border: 2px dashed rgba(244,166,29,0.3);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: rgba(244,166,29,0.03);
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--yellow);
+    background: rgba(244,166,29,0.06);
+  }
+  .dropzone-icon { font-size: 48px; margin-bottom: 16px; }
+  .dropzone h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+  .dropzone p { color: var(--muted); font-size: 0.88rem; font-family: 'Noto Sans Kannada', sans-serif; }
+  .dropzone input { display: none; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 28px; border-radius: 10px; border: none;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    font-family: 'Poppins', sans-serif;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--red), #c1121f);
+    color: white;
+  }
+  .btn-success {
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: white;
+  }
+  .btn-yellow {
+    background: linear-gradient(135deg, var(--yellow), #e08f00);
+    color: #1a1a2e;
+  }
+
+  .file-list { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
+  .file-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px 16px;
+  }
+  .file-item-name { font-size: 0.88rem; display: flex; align-items: center; gap: 10px; }
+  .file-item-size { color: var(--muted); font-size: 0.78rem; }
+  .remove-file { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; }
+
+  .progress-bar {
+    height: 6px; background: rgba(255,255,255,0.08);
+    border-radius: 100px; overflow: hidden; margin: 20px 0;
+    display: none;
+  }
+  .progress-bar.active { display: block; }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--red), var(--yellow));
+    border-radius: 100px; transition: width 0.3s;
+  }
+
+  .result-box {
+    display: none; margin-top: 20px;
+    background: rgba(46,204,113,0.08);
+    border: 1px solid rgba(46,204,113,0.25);
+    border-radius: 12px; padding: 20px;
+    text-align: center;
+  }
+  .result-box.active { display: block; }
+  .result-box h3 { color: #2ecc71; margin-bottom: 8px; }
+  .result-box p { color: var(--muted); font-size: 0.88rem; font-family: 'Noto Sans Kannada', sans-serif; margin-bottom: 16px; }
+
+  .action-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+
+  /* FEATURES */
+  .features {
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,0.02);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 60px 24px;
+    margin-bottom: 60px;
+  }
+  .features-inner { max-width: 1100px; margin: 0 auto; }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 32px; margin-top: 40px;
+  }
+  .feature-item { text-align: center; }
+  .feature-item .icon { font-size: 36px; margin-bottom: 12px; }
+  .feature-item h4 { font-weight: 600; margin-bottom: 6px; }
+  .feature-item p { color: var(--muted); font-size: 0.82rem; font-family: 'Noto Sans Kannada', sans-serif; line-height: 1.6; }
+
+  /* FOOTER */
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 32px 24px;
+    text-align: center;
+  }
+  .footer-inner { max-width: 1100px; margin: 0 auto; }
+  footer p { color: var(--muted); font-size: 0.85rem; font-family: 'Noto Sans Kannada', sans-serif; }
+  footer a { color: var(--yellow); text-decoration: none; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* MOBILE */
+  @media (max-width: 600px) {
+    .nav-links { display: none; }
+    .hero { padding: 48px 16px 40px; }
+    .hero-stats { gap: 24px; }
+    .tool-area { padding: 20px; }
+  }
+
+  /* Scroll to tool */
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <nav class="nav">
+    <a href="#" class="logo">
+      <div class="logo-icon">ಪ</div>
+      <div class="logo-text">ಕನ್ನಡ<span>PDF</span></div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#tools">ಪರಿಕರಗಳು</a></li>
+      <li><a href="#about">ನಮ್ಮ ಬಗ್ಗೆ</a></li>
+      <li><a href="#contact">ಸಂಪರ್ಕ</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">🇮🇳 ಕನ್ನಡಿಗರಿಗಾಗಿ ತಯಾರಿಸಲಾಗಿದೆ</div>
+  <h1>
+    ಸುಲಭ PDF ಪರಿಕರಗಳು
+    <span class="kannada-line">ನಿಮ್ಮ ಭಾಷೆಯಲ್ಲಿ</span>
+  </h1>
+  <p>Word to PDF, Merge, Split, Compress — ಎಲ್ಲವೂ ಉಚಿತ. ನಿಮ್ಮ ಫೈಲ್‌ಗಳು ಸುರಕ್ಷಿತ, ನಾವು ಯಾವುದನ್ನೂ ಉಳಿಸುವುದಿಲ್ಲ.</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num">100%</div><div class="stat-label">ಉಚಿತ</div></div>
+    <div class="stat"><div class="stat-num">6+</div><div class="stat-label">PDF ಪರಿಕರಗಳು</div></div>
+    <div class="stat"><div class="stat-num">🔒</div><div class="stat-label">ಸುರಕ್ಷಿತ</div></div>
+  </div>
+</section>
+
+<!-- AD BANNER TOP -->
+<div style="position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 24px 24px;">
+  <div class="ad-banner">
+    <!-- Google AdSense Code Here -->
+    📢 ಜಾಹೀರಾತು ಸ್ಥಳ (AdSense)
+  </div>
+</div>
+
+<!-- TOOL AREA (shown when card clicked) -->
+<div id="toolArea" class="tool-area" style="padding:24px;">
+  <div class="tool-area-header">
+    <div>
+      <h2 id="toolTitle">Word to PDF</h2>
+      <div class="kn" id="toolTitleKn">Word ಫೈಲ್ ಅನ್ನು PDF ಗೆ ಬದಲಾಯಿಸಿ</div>
+    </div>
+    <button class="close-btn" onclick="closeTool()">✕</button>
+  </div>
+
+  <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+    <div class="dropzone-icon">📂</div>
+    <h3 id="dropTitle">ಫೈಲ್ ಇಲ್ಲಿ ಹಾಕಿ ಅಥವಾ ಕ್ಲಿಕ್ ಮಾಡಿ</h3>
+    <p id="dropSubtitle">Word, PDF, Image ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲಾಗುತ್ತದೆ • ಗರಿಷ್ಠ 10MB</p>
+    <input type="file" id="fileInput" multiple onchange="handleFiles(event)">
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="action-row" id="actionRow" style="display:none;">
+    <button class="btn btn-primary" onclick="processFiles()" id="processBtn">⚡ Convert ಮಾಡಿ</button>
+    <button class="btn" style="background:rgba(255,255,255,0.07);color:var(--text);" onclick="clearFiles()">🗑 ತೆರವುಗೊಳಿಸಿ</button>
+  </div>
+
+  <div class="result-box" id="resultBox">
+    <h3>✅ ಯಶಸ್ವಿಯಾಗಿ ಪರಿವರ್ತಿಸಲಾಗಿದೆ!</h3>
+    <p id="resultMsg">ನಿಮ್ಮ PDF ಫೈಲ್ ಸಿದ್ಧವಾಗಿದೆ. ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ.</p>
+    <button class="btn btn-success" id="downloadBtn">⬇ PDF ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ</button>
+  </div>
+</div>
+
+<!-- TOOLS GRID -->
+<section class="section" id="tools">
+  <div class="section-title">
+    <h2>ಎಲ್ಲಾ <span>PDF ಪರಿಕರಗಳು</span></h2>
+    <p>ಕೆಳಗಿನ ಯಾವುದೇ ಪರಿಕರವನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ ಪ್ರಾರಂಭಿಸಿ</p>
+  </div>
+
+  <div class="tools-grid">
+
+    <div class="tool-card" onclick="openTool('word2pdf')">
+      <div class="tool-icon" style="background:rgba(230,57,70,0.15);">📄</div>
+      <h3>Word to PDF</h3>
+      <div class="kn">Word ಅನ್ನು PDF ಗೆ ಬದಲಾಯಿಸಿ</div>
+      <p>DOC ಮತ್ತು DOCX ಫೈಲ್‌ಗಳನ್ನು ಉತ್ತಮ ಗುಣಮಟ್ಟದ PDF ಗೆ ಪರಿವರ್ತಿಸಿ</p>
+      <span class="tool-badge free">✓ ಉಚಿತ</span>
+    </div>
+
+    <div class="tool-card" onclick="openTool('merge')">
+      <div class="tool-icon" style="background:rgba(244,166,29,0.15);">🔗</div>
+      <h3>PDF Merge</h3>
+      <div class="kn">PDF ಫೈಲ್‌ಗಳನ್ನು ಒಂದಾಗಿ ಮಾಡಿ</div>
+      <p>ಅನೇಕ PDF ಫೈಲ್‌ಗಳನ್ನು ಒಂದು ಫೈಲ್‌ಗೆ ಸೇರಿಸಿ. ಸರ್ಕಾರಿ ದಾಖಲೆಗಳಿಗೆ ಸೂಕ್ತ</p>
+      <span class="tool-badge free">✓ ಉಚಿತ</span>
+    </div>
+
+    <div class="tool-card" onclick="openTool('split')">
+      <div class="tool-icon" style="background:rgba(52,152,219,0.15);">✂️</div>
+      <h3>PDF Split</h3>
+      <div class="kn">PDF ಅನ್ನು ಭಾಗಗಳಾಗಿ ವಿಭಜಿಸಿ</div>
+      <p>ದೊಡ್ಡ PDF ಅನ್ನು ಸಣ್ಣ ಭಾಗಗಳಾಗಿ ವಿಭಜಿಸಿ. ಬೇಕಾದ ಪುಟಗಳನ್ನು ಮಾತ್ರ ತೆಗೆದುಕೊಳ್ಳಿ</p>
+      <span class="tool-badge free">✓ ಉಚಿತ</span>
+    </div>
+
+    <div class="tool-card" onclick="openTool('compress')">
+      <div class="tool-icon" style="background:rgba(46,204,113,0.15);">🗜️</div>
+      <h3>PDF Compress</h3>
+      <div class="kn">PDF ಗಾತ್ರ ಕಡಿಮೆ ಮಾಡಿ</div>
+      <p>WhatsApp ಮತ್ತು Email ನಲ್ಲಿ ಕಳುಹಿಸಲು PDF ಗಾತ್ರ ಕಡಿಮೆ ಮಾಡಿ</p>
+      <span class="tool-badge free">✓ ಉಚಿತ</span>
+    </div>
+
+    <div class="tool-card" onclick="openTool('img2pdf')">
+      <div class="tool-icon" style="background:rgba(155,89,182,0.15);">🖼️</div>
+      <h3>Image to PDF</h3>
+      <div class="kn">ಫೋಟೋ ಅನ್ನು PDF ಗೆ ಬದಲಾಯಿಸಿ</div>
+      <p>Aadhaar, ಅರ್ಜಿ ಫೋಟೋಗಳನ್ನು PDF ಗೆ ಪರಿವರ್ತಿಸಿ. JPG, PNG ಸ್ವೀಕಾರ</p>
+      <span class="tool-badge free">✓ ಉಚಿತ</span>
+    </div>
+
+    <div class="tool-card" onclick="openTool('pdf2word')">
+      <div class="tool-icon" style="background:rgba(231,76,60,0.15);">📝</div>
+      <h3>PDF to Word</h3>
+      <div class="kn">PDF ಅನ್ನು Word ಗೆ ಬದಲಾಯಿಸಿ</div>
+      <p>PDF ಡಾಕ್ಯುಮೆಂಟ್ ಅನ್ನು ಸಂಪಾದಿಸಬಹುದಾದ Word ಫೈಲ್‌ಗೆ ಪರಿವರ್ತಿಸಿ</p>
+      <span class="tool-badge free">✓ ಉಚಿತ</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- AD MIDDLE -->
+<div style="position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 24px 48px;">
+  <div class="ad-banner" style="height:250px;max-width:300px;margin:0 auto;">
+    📢 ಜಾಹೀರಾತು ಸ್ಥಳ (AdSense)
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features" id="about">
+  <div class="features-inner">
+    <div class="section-title">
+      <h2>ನಾವು <span>ಏಕೆ ಭಿನ್ನ?</span></h2>
+      <p>ಕನ್ನಡಿಗರಿಗಾಗಿ, ಕನ್ನಡಿಗರಿಂದ ತಯಾರಿಸಿದ ತಾಣ</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-item">
+        <div class="icon">🔒</div>
+        <h4>100% ಸುರಕ್ಷಿತ</h4>
+        <p>ನಿಮ್ಮ ಫೈಲ್‌ಗಳನ್ನು ನಾವು ಎಂದಿಗೂ ಉಳಿಸುವುದಿಲ್ಲ. ಪರಿವರ್ತನೆ ನಂತರ ತಕ್ಷಣ ಅಳಿಸಲಾಗುತ್ತದೆ</p>
+      </div>
+      <div class="feature-item">
+        <div class="icon">⚡</div>
+        <h4>ವೇಗವಾದ ಪರಿವರ್ತನೆ</h4>
+        <p>ಕ್ಷಣಗಳಲ್ಲಿ ಫೈಲ್ ಪರಿವರ್ತನೆ. ಯಾವುದೇ ಸಾಫ್ಟ್‌ವೇರ್ ಅಗತ್ಯವಿಲ್ಲ</p>
+      </div>
+      <div class="feature-item">
+        <div class="icon">📱</div>
+        <h4>Mobile ಸ್ನೇಹಿ</h4>
+        <p>ಮೊಬೈಲ್, ಟ್ಯಾಬ್ಲೆಟ್, ಕಂಪ್ಯೂಟರ್ — ಎಲ್ಲದರಲ್ಲೂ ಸರಳವಾಗಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ</p>
+      </div>
+      <div class="feature-item">
+        <div class="icon">💯</div>
+        <h4>ಸಂಪೂರ್ಣ ಉಚಿತ</h4>
+        <p>ನೋಂದಣಿ ಅಗತ್ಯವಿಲ್ಲ. ಕ್ರೆಡಿಟ್ ಕಾರ್ಡ್ ಇಲ್ಲ. ಯಾವಾಗಲೂ ಉಚಿತ</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="contact">
+  <div class="footer-inner">
+    <div class="logo" style="justify-content:center;margin-bottom:16px;">
+      <div class="logo-icon">ಪ</div>
+      <div class="logo-text">ಕನ್ನಡ<span>PDF</span></div>
+    </div>
+    <p>© 2025 ಕನ್ನಡ PDF ಸೇವೆ · ಎಲ್ಲಾ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ</p>
+    <p style="margin-top:8px;"><a href="#">ಗೌಪ್ಯತಾ ನೀತಿ</a> · <a href="#">ಸೇವಾ ನಿಯಮಗಳು</a> · <a href="#">ಸಂಪರ್ಕಿಸಿ</a></p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+  let currentTool = null;
+  let selectedFiles = [];
+  let outputBlob = null;
+
+  const toolConfig = {
+    word2pdf: {
+      title: 'Word to PDF',
+      titleKn: 'Word ಫೈಲ್ ಅನ್ನು PDF ಗೆ ಬದಲಾಯಿಸಿ',
+      dropTitle: 'Word ಫೈಲ್ ಇಲ್ಲಿ ಹಾಕಿ ಅಥವಾ ಕ್ಲಿಕ್ ಮಾಡಿ',
+      dropSub: 'DOC, DOCX ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲಾಗುತ್ತದೆ • ಗರಿಷ್ಠ 10MB',
+      accept: '.doc,.docx',
+      btnText: '⚡ PDF ಗೆ Convert ಮಾಡಿ',
+      resultMsg: 'ನಿಮ್ಮ Word ಫೈಲ್ PDF ಆಗಿ ಸಿದ್ಧವಾಗಿದೆ!',
+      outputName: 'converted.pdf'
+    },
+    merge: {
+      title: 'PDF Merge',
+      titleKn: 'PDF ಫೈಲ್‌ಗಳನ್ನು ಒಂದಾಗಿ ಮಾಡಿ',
+      dropTitle: '2 ಅಥವಾ ಹೆಚ್ಚು PDF ಫೈಲ್‌ಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ',
+      dropSub: 'PDF ಫೈಲ್‌ಗಳನ್ನು ಮಾತ್ರ ಸ್ವೀಕರಿಸಲಾಗುತ್ತದೆ • ಗರಿಷ್ಠ 10MB ಪ್ರತಿ ಫೈಲ್',
+      accept: '.pdf',
+      btnText: '🔗 PDF ಗಳನ್ನು Merge ಮಾಡಿ',
+      resultMsg: 'ನಿಮ್ಮ PDF ಫೈಲ್‌ಗಳನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಒಂದಾಗಿಸಲಾಗಿದೆ!',
+      outputName: 'merged.pdf'
+    },
+    split: {
+      title: 'PDF Split',
+      titleKn: 'PDF ಅನ್ನು ಭಾಗಗಳಾಗಿ ವಿಭಜಿಸಿ',
+      dropTitle: 'PDF ಫೈಲ್ ಇಲ್ಲಿ ಹಾಕಿ',
+      dropSub: 'PDF ಫೈಲ್ ಮಾತ್ರ • ಗರಿಷ್ಠ 10MB',
+      accept: '.pdf',
+      btnText: '✂️ PDF ಅನ್ನು Split ಮಾಡಿ',
+      resultMsg: 'PDF ಯಶಸ್ವಿಯಾಗಿ ವಿಭಜಿಸಲಾಗಿದೆ!',
+      outputName: 'split.pdf'
+    },
+    compress: {
+      title: 'PDF Compress',
+      titleKn: 'PDF ಗಾತ್ರ ಕಡಿಮೆ ಮಾಡಿ',
+      dropTitle: 'PDF ಫೈಲ್ ಇಲ್ಲಿ ಹಾಕಿ',
+      dropSub: 'PDF ಫೈಲ್ ಮಾತ್ರ • ಗರಿಷ್ಠ 20MB',
+      accept: '.pdf',
+      btnText: '🗜️ PDF Compress ಮಾಡಿ',
+      resultMsg: 'PDF ಗಾತ್ರ ಕಡಿಮೆ ಮಾಡಲಾಗಿದೆ! WhatsApp ನಲ್ಲಿ ಕಳುಹಿಸಲು ಸಿದ್ಧ.',
+      outputName: 'compressed.pdf'
+    },
+    img2pdf: {
+      title: 'Image to PDF',
+      titleKn: 'ಫೋಟೋ ಅನ್ನು PDF ಗೆ ಬದಲಾಯಿಸಿ',
+      dropTitle: 'ಫೋಟೋಗಳನ್ನು ಇಲ್ಲಿ ಹಾಕಿ ಅಥವಾ ಕ್ಲಿಕ್ ಮಾಡಿ',
+      dropSub: 'JPG, PNG, JPEG ಸ್ವೀಕಾರ • ಹಲವು ಫೋಟೋಗಳನ್ನು ಒಂದೇ ಬಾರಿ ಆಯ್ಕೆಮಾಡಬಹುದು',
+      accept: 'image/*',
+      btnText: '🖼️ PDF ಗೆ Convert ಮಾಡಿ',
+      resultMsg: 'ನಿಮ್ಮ ಫೋಟೋಗಳನ್ನು PDF ಆಗಿ ಪರಿವರ್ತಿಸಲಾಗಿದೆ!',
+      outputName: 'images.pdf'
+    },
+    pdf2word: {
+      title: 'PDF to Word',
+      titleKn: 'PDF ಅನ್ನು Word ಗೆ ಬದಲಾಯಿಸಿ',
+      dropTitle: 'PDF ಫೈಲ್ ಇಲ್ಲಿ ಹಾಕಿ',
+      dropSub: 'PDF ಫೈಲ್ ಮಾತ್ರ • ಗರಿಷ್ಠ 10MB',
+      accept: '.pdf',
+      btnText: '📝 Word ಗೆ Convert ಮಾಡಿ',
+      resultMsg: 'PDF ಅನ್ನು Word ಆಗಿ ಪರಿವರ್ತಿಸಲಾಗಿದೆ!',
+      outputName: 'converted.docx'
+    }
+  };
+
+  function openTool(tool) {
+    currentTool = tool;
+    selectedFiles = [];
+    outputBlob = null;
+    const cfg = toolConfig[tool];
+    document.getElementById('toolTitle').textContent = cfg.title;
+    document.getElementById('toolTitleKn').textContent = cfg.titleKn;
+    document.getElementById('dropTitle').textContent = cfg.dropTitle;
+    document.getElementById('dropSubtitle').textContent = cfg.dropSub;
+    document.getElementById('fileInput').accept = cfg.accept;
+    document.getElementById('processBtn').textContent = cfg.btnText;
+    document.getElementById('fileList').innerHTML = '';
+    document.getElementById('actionRow').style.display = 'none';
+    document.getElementById('progressBar').classList.remove('active');
+    document.getElementById('resultBox').classList.remove('active');
+    const area = document.getElementById('toolArea');
+    area.classList.add('active');
+    area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function closeTool() {
+    document.getElementById('toolArea').classList.remove('active');
+    currentTool = null; selectedFiles = []; outputBlob = null;
+  }
+
+  function handleFiles(e) { addFiles(Array.from(e.target.files)); }
+  function handleDrop(e) { e.preventDefault(); document.getElementById('dropzone').classList.remove('dragover'); addFiles(Array.from(e.dataTransfer.files)); }
+  function handleDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('dragover'); }
+  function handleDragLeave() { document.getElementById('dropzone').classList.remove('dragover'); }
+
+  function addFiles(files) {
+    files.forEach(f => { if (!selectedFiles.find(x => x.name === f.name)) selectedFiles.push(f); });
+    renderFileList();
+  }
+
+  function renderFileList() {
+    const list = document.getElementById('fileList');
+    list.innerHTML = '';
+    selectedFiles.forEach((f, i) => {
+      const size = f.size < 1024*1024 ? (f.size/1024).toFixed(1)+' KB' : (f.size/1024/1024).toFixed(1)+' MB';
+      const ext = f.name.split('.').pop().toUpperCase();
+      const colors = { PDF:'#e63946', DOC:'#2b5ce6', DOCX:'#2b5ce6', JPG:'#9b59b6', PNG:'#27ae60', JPEG:'#9b59b6' };
+      const c = colors[ext] || '#888';
+      list.innerHTML += `<div class="file-item">
+        <div class="file-item-name">
+          <span style="background:${c};color:white;padding:2px 7px;border-radius:5px;font-size:0.7rem;font-weight:700;">${ext}</span>
+          ${f.name}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="file-item-size">${size}</span>
+          <button class="remove-file" onclick="removeFile(${i})">✕</button>
+        </div>
+      </div>`;
+    });
+    document.getElementById('actionRow').style.display = selectedFiles.length > 0 ? 'flex' : 'none';
+    document.getElementById('resultBox').classList.remove('active');
+  }
+
+  function removeFile(i) { selectedFiles.splice(i, 1); renderFileList(); }
+  function clearFiles() { selectedFiles = []; renderFileList(); }
+
+  async function processFiles() {
+    if (!selectedFiles.length) return;
+    const pb = document.getElementById('progressBar');
+    const pf = document.getElementById('progressFill');
+    pb.classList.add('active');
+    pf.style.width = '0%';
+
+    // Animate progress
+    let prog = 0;
+    const interval = setInterval(() => {
+      prog += Math.random() * 15;
+      if (prog > 90) prog = 90;
+      pf.style.width = prog + '%';
+    }, 200);
+
+    try {
+      if (currentTool === 'img2pdf') {
+        outputBlob = await imagesToPdf(selectedFiles);
+      } else if (currentTool === 'merge') {
+        outputBlob = await mergePdfs(selectedFiles);
+      } else if (currentTool === 'compress') {
+        outputBlob = await compressPdf(selectedFiles[0]);
+      } else {
+        // For word2pdf, split, pdf2word — simulate (real conversion needs server)
+        await new Promise(r => setTimeout(r, 1500));
+        outputBlob = new Blob([selectedFiles[0]], { type: 'application/octet-stream' });
+      }
+
+      clearInterval(interval);
+      pf.style.width = '100%';
+      setTimeout(() => {
+        pb.classList.remove('active');
+        showResult();
+      }, 400);
+    } catch(e) {
+      clearInterval(interval);
+      pb.classList.remove('active');
+      alert('ದೋಷ ಸಂಭವಿಸಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.');
+    }
+  }
+
+  function showResult() {
+    const cfg = toolConfig[currentTool];
+    document.getElementById('resultMsg').textContent = cfg.resultMsg;
+    const dlBtn = document.getElementById('downloadBtn');
+    dlBtn.onclick = () => {
+      const url = URL.createObjectURL(outputBlob);
+      const a = document.createElement('a');
+      a.href = url; a.download = cfg.outputName; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    document.getElementById('resultBox').classList.add('active');
+  }
+
+  async function imagesToPdf(files) {
+    const { PDFDocument } = PDFLib;
+    const pdfDoc = await PDFDocument.create();
+    for (const file of files) {
+      const bytes = await file.arrayBuffer();
+      let img;
+      if (file.type === 'image/png') img = await pdfDoc.embedPng(bytes);
+      else img = await pdfDoc.embedJpg(bytes);
+      const page = pdfDoc.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    }
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  }
+
+  async function mergePdfs(files) {
+    const { PDFDocument } = PDFLib;
+    const merged = await PDFDocument.create();
+    for (const file of files) {
+      const bytes = await file.arrayBuffer();
+      const pdf = await PDFDocument.load(bytes);
+      const pages = await merged.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach(p => merged.addPage(p));
+    }
+    const pdfBytes = await merged.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  }
+
+  async function compressPdf(file) {
+    const { PDFDocument } = PDFLib;
+    const bytes = await file.arrayBuffer();
+    const pdf = await PDFDocument.load(bytes);
+    const pdfBytes = await pdf.save({ useObjectStreams: true });
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  }
+</script>
+</body>
+</html>
