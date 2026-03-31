@@ -2,7 +2,7 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from pypdf import PdfWriter, PdfReader
 from docx import Document
-import os, tempfile, uuid, io, subprocess, shutil
+import os, tempfile, uuid, io, subprocess, shutil, platform
 
 app = Flask(__name__)
 CORS(app)
@@ -18,10 +18,25 @@ def cleanup(*paths):
             if p and os.path.exists(p): os.remove(p)
         except: pass
 
+def get_soffice_path():
+    if platform.system() == 'Windows':
+        # Windows path after installing LibreOffice
+        paths = [
+            r'C:\Program Files\LibreOffice\program\soffice.exe',
+            r'C:\Program Files (x86)\LibreOffice\program\soffice.exe',
+        ]
+        for p in paths:
+            if os.path.exists(p):
+                return p
+        raise RuntimeError("LibreOffice not installed. Install from https://www.libreoffice.org/download and restart server.")
+    else:
+        # Linux — Render.com server
+        return 'soffice'
+
 def libreoffice_convert(input_path, output_format, output_dir):
-    """Use LibreOffice — preserves ALL formatting, fonts, tables, bold, layout."""
+    soffice = get_soffice_path()
     cmd = [
-        'soffice', '--headless', '--norestore', '--nofirststartwizard',
+        soffice, '--headless', '--norestore', '--nofirststartwizard',
         '--convert-to', output_format,
         '--outdir', output_dir,
         input_path
@@ -38,7 +53,7 @@ def libreoffice_convert(input_path, output_format, output_dir):
         if matches:
             out_file = os.path.join(output_dir, matches[0])
         else:
-            raise RuntimeError(f"Output file not found. Dir contents: {files}")
+            raise RuntimeError(f"Output file not found. Dir: {files}")
     return out_file
 
 @app.route('/')
@@ -47,7 +62,6 @@ def health():
 
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf():
-    """FIXED: LibreOffice preserves bold, italics, tables, fonts, full template layout."""
     if 'file' not in request.files:
         return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
     file = request.files['file']
@@ -67,7 +81,6 @@ def word_to_pdf():
 
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
-    """FIXED: LibreOffice for better PDF→DOCX layout preservation."""
     if 'file' not in request.files:
         return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
     file = request.files['file']
