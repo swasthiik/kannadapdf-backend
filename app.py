@@ -2,9 +2,7 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from pypdf import PdfWriter, PdfReader
 from docx import Document
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-import os, tempfile, uuid, io
+import os, tempfile, uuid, io, subprocess, shutil
 
 app = Flask(__name__)
 CORS(app)
@@ -20,59 +18,74 @@ def cleanup(*paths):
             if p and os.path.exists(p): os.remove(p)
         except: pass
 
+def libreoffice_convert(input_path, output_format, output_dir):
+    """Use LibreOffice — preserves ALL formatting, fonts, tables, bold, layout."""
+    cmd = [
+        'soffice', '--headless', '--norestore', '--nofirststartwizard',
+        '--convert-to', output_format,
+        '--outdir', output_dir,
+        input_path
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        raise RuntimeError(f"LibreOffice failed: {result.stderr}")
+    base = os.path.splitext(os.path.basename(input_path))[0]
+    ext = output_format.split(':')[0]
+    out_file = os.path.join(output_dir, f"{base}.{ext}")
+    if not os.path.exists(out_file):
+        files = os.listdir(output_dir)
+        matches = [f for f in files if f.startswith(base)]
+        if matches:
+            out_file = os.path.join(output_dir, matches[0])
+        else:
+            raise RuntimeError(f"Output file not found. Dir contents: {files}")
+    return out_file
+
 @app.route('/')
 def health():
     return jsonify({'status': 'ok', 'message': 'ಕನ್ನಡ PDF API ಚಾಲನೆಯಲ್ಲಿದೆ'})
 
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf():
+    """FIXED: LibreOffice preserves bold, italics, tables, fonts, full template layout."""
     if 'file' not in request.files:
         return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
     file = request.files['file']
     if not file.filename.lower().endswith(('.doc', '.docx')):
         return jsonify({'error': 'DOC ಅಥವಾ DOCX ಮಾತ್ರ ಸ್ವೀಕಾರ'}), 400
     input_path = tmp_path('docx')
+    out_dir = tempfile.mkdtemp()
     file.save(input_path)
     try:
-        doc = Document(input_path)
-        buf = io.BytesIO()
-        c = canvas.Canvas(buf, pagesize=A4)
-        width, height = A4
-        y = height - 50
-        c.setFont("Helvetica", 11)
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if not text:
-                y -= 10
-                continue
-            words = text.split()
-            line = ""
-            for word in words:
-                test = line + " " + word if line else word
-                if c.stringWidth(test, "Helvetica", 11) < width - 80:
-                    line = test
-                else:
-                    c.drawString(40, y, line)
-                    y -= 18
-                    line = word
-                    if y < 60:
-                        c.showPage()
-                        c.setFont("Helvetica", 11)
-                        y = height - 50
-            if line:
-                c.drawString(40, y, line)
-                y -= 18
-            if y < 60:
-                c.showPage()
-                c.setFont("Helvetica", 11)
-                y = height - 50
-        c.save()
-        buf.seek(0)
-        return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name='converted.pdf')
+        out_file = libreoffice_convert(input_path, 'pdf', out_dir)
+        return send_file(out_file, mimetype='application/pdf', as_attachment=True, download_name='converted.pdf')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         cleanup(input_path)
+        shutil.rmtree(out_dir, ignore_errors=True)
+
+@app.route('/pdf-to-word', methods=['POST'])
+def pdf_to_word():
+    """FIXED: LibreOffice for better PDF→DOCX layout preservation."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
+    file = request.files['file']
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'PDF ಮಾತ್ರ ಸ್ವೀಕಾರ'}), 400
+    input_path = tmp_path('pdf')
+    out_dir = tempfile.mkdtemp()
+    file.save(input_path)
+    try:
+        out_file = libreoffice_convert(input_path, 'docx', out_dir)
+        return send_file(out_file,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True, download_name='converted.docx')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cleanup(input_path)
+        shutil.rmtree(out_dir, ignore_errors=True)
 
 @app.route('/pdf-merge', methods=['POST'])
 def pdf_merge():
@@ -123,6 +136,9 @@ def pdf_split():
 
 @app.route('/img-to-pdf', methods=['POST'])
 def img_to_pdf():
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from PIL import Image
     files = request.files.getlist('files')
     if not files:
         return jsonify({'error': 'ಚಿತ್ರಗಳು ಕಂಡುಬಂದಿಲ್ಲ'}), 400
@@ -139,7 +155,7 @@ def img_to_pdf():
             img_w, img_h = img.size
             ratio = min(w / img_w, h / img_h)
             new_w, new_h = img_w * ratio, img_h * ratio
-            c.drawImage(path, (w-new_w)/2, (h-new_h)/2, new_w, new_h)
+            c.drawImage(path, (w - new_w) / 2, (h - new_h) / 2, new_w, new_h)
             c.showPage()
         c.save()
         buf.seek(0)
@@ -149,31 +165,6 @@ def img_to_pdf():
     finally:
         cleanup(*saved)
 
-@app.route('/pdf-to-word', methods=['POST'])
-def pdf_to_word():
-    if 'file' not in request.files:
-        return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
-    file = request.files['file']
-    input_path = tmp_path('pdf')
-    file.save(input_path)
-    try:
-        reader = PdfReader(input_path)
-        doc = Document()
-        doc.add_heading('Converted from PDF', 0)
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text:
-                doc.add_heading(f'Page {i+1}', level=2)
-                doc.add_paragraph(text)
-        buf = io.BytesIO()
-        doc.save(buf)
-        buf.seek(0)
-        return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document', as_attachment=True, download_name='converted.docx')
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cleanup(input_path)
-
 def parse_pages(pages_param, total):
     if not pages_param:
         return list(range(total))
@@ -182,7 +173,7 @@ def parse_pages(pages_param, total):
         part = part.strip()
         if '-' in part:
             s, e = part.split('-')
-            for p in range(int(s)-1, int(e)):
+            for p in range(int(s) - 1, int(e)):
                 if 0 <= p < total: pages.add(p)
         else:
             p = int(part) - 1
