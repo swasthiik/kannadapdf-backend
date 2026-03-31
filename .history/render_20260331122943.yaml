@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: kannadapdf-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    # LibreOffice is pre-installed on Render's Ubuntu environment.
+    # If not available, use the Docker approach below instead.
