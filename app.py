@@ -1,11 +1,10 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from pypdf import PdfWriter, PdfReader
-from docx import Document as DocxDocument
+from docx import Document
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from PIL import Image
-import os, tempfile, uuid, io, subprocess, shutil, platform
+import os, tempfile, uuid, io
 
 app = Flask(__name__)
 CORS(app)
@@ -21,74 +20,10 @@ def cleanup(*paths):
             if p and os.path.exists(p): os.remove(p)
         except: pass
 
-def get_soffice_path():
-    if platform.system() == 'Windows':
-        paths = [
-            r'C:\Program Files\LibreOffice\program\soffice.exe',
-            r'C:\Program Files (x86)\LibreOffice\program\soffice.exe',
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                return p
-        raise RuntimeError("LibreOffice not found")
-    else:
-        for cmd in ['libreoffice', 'soffice']:
-            if shutil.which(cmd):
-                return cmd
-        raise RuntimeError("LibreOffice not installed on server")
-
-def libreoffice_convert(input_path, output_format, output_dir):
-    soffice = get_soffice_path()
-    env = os.environ.copy()
-    if platform.system() != 'Windows':
-        env['HOME'] = output_dir
-
-    cmd = [
-        soffice, '--headless', '--norestore', '--nofirststartwizard',
-        '--convert-to', output_format,
-        '--outdir', output_dir,
-        input_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
-
-    if result.returncode != 0:
-        raise RuntimeError(f"LibreOffice error: {result.stderr or result.stdout}")
-
-    base = os.path.splitext(os.path.basename(input_path))[0]
-    ext = output_format.split(':')[0]
-    out_file = os.path.join(output_dir, f"{base}.{ext}")
-
-    if not os.path.exists(out_file):
-        files = os.listdir(output_dir)
-        matches = [f for f in files if f.startswith(base)]
-        if matches:
-            out_file = os.path.join(output_dir, matches[0])
-        else:
-            raise RuntimeError(f"Output file not found. Files: {files}")
-    return out_file
-
-
-# ─────────────────────────────────────────
-# HEALTH CHECK
-# ─────────────────────────────────────────
 @app.route('/')
 def health():
-    try:
-        soffice = get_soffice_path()
-        lo_status = f"Found: {soffice}"
-    except Exception as e:
-        lo_status = f"NOT found: {str(e)}"
-    return jsonify({
-        'status': 'ok',
-        'message': 'ಕನ್ನಡ PDF API ಚಾಲನೆಯಲ್ಲಿದೆ',
-        'libreoffice': lo_status,
-        'tools': ['word-to-pdf', 'pdf-to-word', 'pdf-merge', 'pdf-split', 'img-to-pdf', 'pdf-compress']
-    })
+    return jsonify({'status': 'ok', 'message': 'ಕನ್ನಡ PDF API ಚಾಲನೆಯಲ್ಲಿದೆ'})
 
-
-# ─────────────────────────────────────────
-# 1. WORD TO PDF — LibreOffice (perfect formatting)
-# ─────────────────────────────────────────
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf():
     if 'file' not in request.files:
@@ -96,70 +31,54 @@ def word_to_pdf():
     file = request.files['file']
     if not file.filename.lower().endswith(('.doc', '.docx')):
         return jsonify({'error': 'DOC ಅಥವಾ DOCX ಮಾತ್ರ ಸ್ವೀಕಾರ'}), 400
-
     input_path = tmp_path('docx')
-    out_dir = tempfile.mkdtemp()
     file.save(input_path)
     try:
-        out_file = libreoffice_convert(input_path, 'pdf', out_dir)
-        return send_file(out_file, mimetype='application/pdf', as_attachment=True, download_name='converted.pdf')
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cleanup(input_path)
-        shutil.rmtree(out_dir, ignore_errors=True)
-
-
-# ─────────────────────────────────────────
-# 2. PDF TO WORD — extract text into docx
-# ─────────────────────────────────────────
-@app.route('/pdf-to-word', methods=['POST'])
-def pdf_to_word():
-    if 'file' not in request.files:
-        return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
-    file = request.files['file']
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': 'PDF ಮಾತ್ರ ಸ್ವೀಕಾರ'}), 400
-
-    input_path = tmp_path('pdf')
-    file.save(input_path)
-    try:
-        reader = PdfReader(input_path)
-        doc = DocxDocument()
-        doc.add_heading('Converted Document', 0)
-
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text and text.strip():
-                doc.add_heading(f'Page {i+1}', level=2)
-                for line in text.split('\n'):
-                    if line.strip():
-                        doc.add_paragraph(line.strip())
-
+        doc = Document(input_path)
         buf = io.BytesIO()
-        doc.save(buf)
+        c = canvas.Canvas(buf, pagesize=A4)
+        width, height = A4
+        y = height - 50
+        c.setFont("Helvetica", 11)
+        for para in doc.paragraphs:
+            text = para.text.strip()
+            if not text:
+                y -= 10
+                continue
+            words = text.split()
+            line = ""
+            for word in words:
+                test = line + " " + word if line else word
+                if c.stringWidth(test, "Helvetica", 11) < width - 80:
+                    line = test
+                else:
+                    c.drawString(40, y, line)
+                    y -= 18
+                    line = word
+                    if y < 60:
+                        c.showPage()
+                        c.setFont("Helvetica", 11)
+                        y = height - 50
+            if line:
+                c.drawString(40, y, line)
+                y -= 18
+            if y < 60:
+                c.showPage()
+                c.setFont("Helvetica", 11)
+                y = height - 50
+        c.save()
         buf.seek(0)
-        return send_file(
-            buf,
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            as_attachment=True,
-            download_name='converted.docx'
-        )
+        return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name='converted.pdf')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         cleanup(input_path)
 
-
-# ─────────────────────────────────────────
-# 3. PDF MERGE
-# ─────────────────────────────────────────
 @app.route('/pdf-merge', methods=['POST'])
 def pdf_merge():
     files = request.files.getlist('files')
     if len(files) < 2:
         return jsonify({'error': 'ಕನಿಷ್ಠ 2 PDF ಬೇಕು'}), 400
-
     saved = []
     try:
         writer = PdfWriter()
@@ -178,10 +97,6 @@ def pdf_merge():
     finally:
         cleanup(*saved)
 
-
-# ─────────────────────────────────────────
-# 4. PDF SPLIT
-# ─────────────────────────────────────────
 @app.route('/pdf-split', methods=['POST'])
 def pdf_split():
     if 'file' not in request.files:
@@ -206,48 +121,26 @@ def pdf_split():
     finally:
         cleanup(input_path)
 
-
-# ─────────────────────────────────────────
-# 5. IMAGE TO PDF
-# ─────────────────────────────────────────
 @app.route('/img-to-pdf', methods=['POST'])
 def img_to_pdf():
     files = request.files.getlist('files')
     if not files:
         return jsonify({'error': 'ಚಿತ್ರಗಳು ಕಂಡುಬಂದಿಲ್ಲ'}), 400
-
     saved = []
     try:
         buf = io.BytesIO()
         c = canvas.Canvas(buf, pagesize=A4)
         w, h = A4
-
         for file in files:
             path = tmp_path('img')
             file.save(path)
             saved.append(path)
-
             img = Image.open(path)
-            # Fix transparency issues
-            if img.mode in ('RGBA', 'P', 'LA'):
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                if img.mode == 'P':
-                    img = img.convert('RGBA')
-                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                img = background
-                img.save(path, 'JPEG', quality=95)
-            elif img.mode != 'RGB':
-                img = img.convert('RGB')
-                img.save(path, 'JPEG', quality=95)
-
             img_w, img_h = img.size
             ratio = min(w / img_w, h / img_h)
             new_w, new_h = img_w * ratio, img_h * ratio
-            x = (w - new_w) / 2
-            y = (h - new_h) / 2
-            c.drawImage(path, x, y, new_w, new_h, preserveAspectRatio=True)
+            c.drawImage(path, (w-new_w)/2, (h-new_h)/2, new_w, new_h)
             c.showPage()
-
         c.save()
         buf.seek(0)
         return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name='images.pdf')
@@ -256,67 +149,31 @@ def img_to_pdf():
     finally:
         cleanup(*saved)
 
-
-# ─────────────────────────────────────────
-# 6. PDF COMPRESS
-# ─────────────────────────────────────────
-@app.route('/pdf-compress', methods=['POST'])
-def pdf_compress():
+@app.route('/pdf-to-word', methods=['POST'])
+def pdf_to_word():
     if 'file' not in request.files:
         return jsonify({'error': 'ಫೈಲ್ ಕಂಡುಬಂದಿಲ್ಲ'}), 400
     file = request.files['file']
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': 'PDF ಮಾತ್ರ ಸ್ವೀಕಾರ'}), 400
-
     input_path = tmp_path('pdf')
     file.save(input_path)
-    original_size = os.path.getsize(input_path)
-
     try:
         reader = PdfReader(input_path)
-        writer = PdfWriter()
-
-        for page in reader.pages:
-            # Compress page contents
-            page.compress_content_streams()
-            writer.add_page(page)
-
-        # Copy metadata
-        if reader.metadata:
-            writer.add_metadata(reader.metadata)
-
-        # Enable object streams for better compression
-        writer._header = b'%PDF-1.4'
-
+        doc = Document()
+        doc.add_heading('Converted from PDF', 0)
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if text:
+                doc.add_heading(f'Page {i+1}', level=2)
+                doc.add_paragraph(text)
         buf = io.BytesIO()
-        writer.write(buf)
+        doc.save(buf)
         buf.seek(0)
-
-        compressed_size = buf.getbuffer().nbytes
-        saved_percent = round((1 - compressed_size / original_size) * 100, 1)
-
-        response = send_file(
-            buf,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name='compressed.pdf'
-        )
-        # Send size info in headers
-        response.headers['X-Original-Size'] = str(original_size)
-        response.headers['X-Compressed-Size'] = str(compressed_size)
-        response.headers['X-Saved-Percent'] = str(saved_percent)
-        response.headers['Access-Control-Expose-Headers'] = 'X-Original-Size, X-Compressed-Size, X-Saved-Percent'
-        return response
-
+        return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document', as_attachment=True, download_name='converted.docx')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         cleanup(input_path)
 
-
-# ─────────────────────────────────────────
-# HELPER
-# ─────────────────────────────────────────
 def parse_pages(pages_param, total):
     if not pages_param:
         return list(range(total))
@@ -325,13 +182,172 @@ def parse_pages(pages_param, total):
         part = part.strip()
         if '-' in part:
             s, e = part.split('-')
-            for p in range(int(s) - 1, int(e)):
+            for p in range(int(s)-1, int(e)):
                 if 0 <= p < total: pages.add(p)
         else:
             p = int(part) - 1
             if 0 <= p < total: pages.add(p)
     return sorted(pages)
 
+
+# ─────────────────────────────────────────
+# 7. AI RESUME BUILDER — Gemini AI
+# ─────────────────────────────────────────
+import requests as req_lib, json
+
+GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+
+def call_gemini(prompt):
+    headers = {'Content-Type': 'application/json'}
+    data = {'contents': [{'parts': [{'text': prompt}]}]}
+    r = req_lib.post(f'{GEMINI_URL}?key={GEMINI_KEY}', headers=headers, json=data, timeout=40)
+    r.raise_for_status()
+    return r.json()['candidates'][0]['content']['parts'][0]['text']
+
+def build_resume_pdf(text):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+        rightMargin=0.65*inch, leftMargin=0.65*inch,
+        topMargin=0.65*inch, bottomMargin=0.65*inch)
+
+    name_s  = ParagraphStyle('n', fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=3, textColor=colors.HexColor('#1a1a2e'))
+    cont_s  = ParagraphStyle('c', fontSize=9,  fontName='Helvetica', alignment=TA_CENTER, spaceAfter=10, textColor=colors.HexColor('#555'))
+    head_s  = ParagraphStyle('h', fontSize=11, fontName='Helvetica-Bold', spaceBefore=8, spaceAfter=3, textColor=colors.HexColor('#e63946'))
+    body_s  = ParagraphStyle('b', fontSize=9.5, fontName='Helvetica', spaceAfter=3, leading=14, textColor=colors.HexColor('#222'))
+    bull_s  = ParagraphStyle('bl', fontSize=9.5, fontName='Helvetica', spaceAfter=2, leading=13, leftIndent=14, textColor=colors.HexColor('#333'))
+
+    story = []
+    lines = [l.rstrip() for l in text.strip().split('\n')]
+    name_done = False
+
+    for line in lines:
+        if not line.strip():
+            story.append(Spacer(1, 3))
+            continue
+        if line.startswith('##'):
+            txt = line.replace('##','').replace('**','').strip()
+            story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#e63946'), spaceAfter=4))
+            story.append(Paragraph(txt.upper(), head_s))
+        elif line.startswith('#') and not name_done:
+            story.append(Paragraph(line.replace('#','').replace('**','').strip(), name_s))
+            name_done = True
+        elif line.startswith('- ') or line.startswith('• '):
+            story.append(Paragraph('• ' + line[2:].replace('**','').strip(), bull_s))
+        elif any(x in line for x in ['@','|','+91','linkedin','github','http']) and not name_done:
+            story.append(Paragraph(line.replace('**','').strip(), cont_s))
+            name_done = True
+        elif line.startswith('**') and line.endswith('**'):
+            story.append(Paragraph(line.replace('**','').strip(), ParagraphStyle('sb', fontSize=9.5, fontName='Helvetica-Bold', spaceAfter=2, textColor=colors.HexColor('#222'))))
+        else:
+            clean = line.replace('**','').replace('##','').replace('#','').strip()
+            if clean:
+                if not name_done and len(clean) < 50:
+                    story.append(Paragraph(clean, name_s))
+                    name_done = True
+                else:
+                    story.append(Paragraph(clean, body_s))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+@app.route('/ai-resume-build', methods=['POST'])
+def ai_resume_build():
+    """Build resume from form data using Gemini AI"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    name     = data.get('name','')
+    email    = data.get('email','')
+    phone    = data.get('phone','')
+    linkedin = data.get('linkedin','')
+    summary  = data.get('summary','')
+    skills   = data.get('skills','')
+    education= data.get('education','')
+    experience=data.get('experience','')
+    projects = data.get('projects','')
+    certifications=data.get('certifications','')
+
+    prompt = f"""Create a professional resume in clean plain text format for:
+
+Name: {name}
+Email: {email}
+Phone: {phone}
+LinkedIn: {linkedin}
+Summary: {summary}
+Skills: {skills}
+Education: {education}
+Experience: {experience}
+Projects: {projects}
+Certifications: {certifications}
+
+Format rules:
+- First line: just the person name
+- Second line: contact info separated by | symbols
+- Use ## for section headings (OBJECTIVE, EDUCATION, EXPERIENCE, PROJECTS, SKILLS, CERTIFICATIONS)
+- Use - for bullet points
+- Use **text** for bold job titles or company names
+- Keep it professional, clean, ATS-friendly
+- Only output the resume text, nothing else"""
+
+    try:
+        resume_text = call_gemini(prompt)
+        pdf_buf = build_resume_pdf(resume_text)
+        return send_file(pdf_buf, mimetype='application/pdf', as_attachment=True, download_name='resume.pdf')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/ai-resume-improve', methods=['POST'])
+def ai_resume_improve():
+    """Improve existing resume using Gemini AI"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'File not found'}), 400
+
+    file = request.files['file']
+    job_role = request.form.get('job_role', 'Software Engineer')
+    input_path = tmp_path('pdf' if file.filename.lower().endswith('.pdf') else 'docx')
+    file.save(input_path)
+
+    try:
+        # Extract text from uploaded file
+        if input_path.endswith('.pdf'):
+            reader = PdfReader(input_path)
+            resume_text = ' '.join([p.extract_text() or '' for p in reader.pages])
+        else:
+            doc = DocxDocument(input_path)
+            resume_text = ' '.join([p.text for p in doc.paragraphs if p.text.strip()])
+
+        prompt = f"""You are a professional resume writer. Improve and reformat this resume for the role of "{job_role}".
+
+Original resume:
+{resume_text}
+
+Instructions:
+- Keep all original information, just improve wording and structure
+- First line: just the person name
+- Second line: contact info with | separators
+- Use ## for section headings (OBJECTIVE, EDUCATION, EXPERIENCE, PROJECTS, SKILLS, CERTIFICATIONS)
+- Use - for bullet points
+- Use **text** for bold job titles or company names
+- Make it ATS-friendly and professional
+- Only output the improved resume, nothing else"""
+
+        improved_text = call_gemini(prompt)
+        pdf_buf = build_resume_pdf(improved_text)
+        return send_file(pdf_buf, mimetype='application/pdf', as_attachment=True, download_name='improved_resume.pdf')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cleanup(input_path)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
