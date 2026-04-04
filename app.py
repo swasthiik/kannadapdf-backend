@@ -191,12 +191,13 @@ def parse_pages(pages_param, total):
 
 
 # ─────────────────────────────────────────
-# 7. AI RESUME BUILDER — Gemini AI
+# GEMINI AI — shared setup
 # ─────────────────────────────────────────
 import requests as req_lib, json
 
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+GEMINI_CHAT_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
 def call_gemini(prompt):
     headers = {'Content-Type': 'application/json'}
@@ -205,6 +206,68 @@ def call_gemini(prompt):
     r.raise_for_status()
     return r.json()['candidates'][0]['content']['parts'][0]['text']
 
+
+# ─────────────────────────────────────────
+# AI CHAT — Resume Chatbot (NEW)
+# ─────────────────────────────────────────
+@app.route('/ai-chat', methods=['POST'])
+def ai_chat():
+    """Conversational AI chatbot for resume building"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    messages  = data.get('messages', [])
+    system    = data.get('system', '')
+
+    if not messages:
+        return jsonify({'error': 'No messages provided'}), 400
+
+    try:
+        # Build Gemini contents array from chat history
+        contents = []
+
+        # Add system prompt as first user turn (Gemini doesn't have a system field)
+        if system:
+            contents.append({
+                'role': 'user',
+                'parts': [{'text': f'[SYSTEM INSTRUCTIONS]\n{system}\n[END SYSTEM]\n\nAcknowledge you understand.'}]
+            })
+            contents.append({
+                'role': 'model',
+                'parts': [{'text': 'Understood! I am your AI Resume Assistant. I will help users build professional resumes through conversation.'}]
+            })
+
+        # Add conversation history
+        for msg in messages:
+            role = 'user' if msg.get('role') == 'user' else 'model'
+            contents.append({
+                'role': role,
+                'parts': [{'text': msg.get('content', '')}]
+            })
+
+        headers = {'Content-Type': 'application/json'}
+        payload = {'contents': contents}
+
+        r = req_lib.post(
+            f'{GEMINI_CHAT_URL}?key={GEMINI_KEY}',
+            headers=headers,
+            json=payload,
+            timeout=40
+        )
+        r.raise_for_status()
+        reply = r.json()['candidates'][0]['content']['parts'][0]['text']
+        return jsonify({'reply': reply})
+
+    except req_lib.exceptions.HTTPError as e:
+        return jsonify({'error': f'Gemini API error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ─────────────────────────────────────────
+# AI RESUME BUILDER — Gemini AI
+# ─────────────────────────────────────────
 def build_resume_pdf(text):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -261,21 +324,20 @@ def build_resume_pdf(text):
 
 @app.route('/ai-resume-build', methods=['POST'])
 def ai_resume_build():
-    """Build resume from form data using Gemini AI"""
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
 
-    name     = data.get('name','')
-    email    = data.get('email','')
-    phone    = data.get('phone','')
-    linkedin = data.get('linkedin','')
-    summary  = data.get('summary','')
-    skills   = data.get('skills','')
-    education= data.get('education','')
-    experience=data.get('experience','')
-    projects = data.get('projects','')
-    certifications=data.get('certifications','')
+    name          = data.get('name','')
+    email         = data.get('email','')
+    phone         = data.get('phone','')
+    linkedin      = data.get('linkedin','')
+    summary       = data.get('summary','')
+    skills        = data.get('skills','')
+    education     = data.get('education','')
+    experience    = data.get('experience','')
+    projects      = data.get('projects','')
+    certifications= data.get('certifications','')
 
     prompt = f"""Create a professional resume in clean plain text format for:
 
@@ -308,7 +370,6 @@ Format rules:
 
 @app.route('/ai-resume-improve', methods=['POST'])
 def ai_resume_improve():
-    """Improve existing resume using Gemini AI"""
     if 'file' not in request.files:
         return jsonify({'error': 'File not found'}), 400
 
@@ -318,12 +379,11 @@ def ai_resume_improve():
     file.save(input_path)
 
     try:
-        # Extract text from uploaded file
         if input_path.endswith('.pdf'):
             reader = PdfReader(input_path)
             resume_text = ' '.join([p.extract_text() or '' for p in reader.pages])
         else:
-            doc = DocxDocument(input_path)
+            doc = Document(input_path)
             resume_text = ' '.join([p.text for p in doc.paragraphs if p.text.strip()])
 
         prompt = f"""You are a professional resume writer. Improve and reformat this resume for the role of "{job_role}".
@@ -348,6 +408,7 @@ Instructions:
         return jsonify({'error': str(e)}), 500
     finally:
         cleanup(input_path)
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
